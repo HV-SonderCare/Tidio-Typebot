@@ -1,0 +1,468 @@
+<style>
+  /* 1. TIDIO WRAPPER (The Invisible Box) - Always Pass-Through */
+  #tidio-chat {
+    opacity: 0;
+    visibility: hidden;
+    z-index: 9999999999 !important;
+    pointer-events: none !important;
+  }
+
+  /* 2. VISIBLE STATE */
+  #tidio-chat.tidio-visible {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  /* 3. CHAT WINDOW - Capture clicks */
+  #tidio-chat iframe {
+    pointer-events: auto !important;
+  }
+
+  /* Custom overlay button (tree icon) */
+  #custom-tidio-button {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    display: block;
+    position: fixed;
+    left: 28px;
+    bottom: 55px;
+    width: 55px;
+    height: 55px;
+    z-index: 10000000000 !important;
+    background: url('https://www.sondercare.com/wp-content/uploads/2025/09/Chat-bubble-sized.png') no-repeat center center;
+    background-size: 85%;
+    cursor: pointer;
+  }
+
+  #custom-tidio-button.button-visible {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  @media (max-width: 767px) {
+    #custom-tidio-button {
+      left: 2px;
+      bottom: 58px;
+    }
+  }
+
+  /* TYPEBOT STYLING */
+  typebot-bubble {
+    z-index: 9999 !important;
+  }
+
+  typebot-bubble::part(preview-message) {
+    display: inline-flex;
+    align-items: center;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 0.88rem;
+    padding-bottom: 0.78rem;
+    background-color: #c3ab74;
+    color: #25385b;
+    border: 2px solid #25385b;
+    font-family: sans-serif;
+    font-size: 0.875rem;
+    border-radius: 0.5rem;
+    transition: all 300ms ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    position: fixed;
+    bottom: 1.28rem;
+    left: 4.4rem;
+    width: auto !important;
+    z-index: 10000 !important;
+  }
+
+  typebot-bubble::part(preview-message):hover {
+    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  typebot-bubble::part(preview-message-close-button) {
+    opacity: 1 !important;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  typebot-bubble::part(button-icon) {
+    color: #25385b !important;
+    fill: #25385b !important;
+    width: 25px;
+    height: 25px;
+  }
+
+  typebot-bubble::part(button) {
+    border-radius: 50% !important;
+  }
+
+  typebot-bubble[style*="display: none"] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+</style>
+
+<!-- Custom Tidio overlay button -->
+<div id="custom-tidio-button"></div>
+
+<!-- Tidio script -->
+<script src="//code.tidio.co/sr4jfyhwifrijb0tosczzkgctr8wbwty.js" async></script>
+
+
+<script>
+  /********************
+   * Global Logic     *
+   ********************/
+  let secondsOpen = 0;
+
+  // 1. Session Storage Interaction Flag
+  function markAsInteracted(reason) {
+    if (!sessionStorage.getItem("tidioInteracted")) {
+      console.log(`[Tidio] Interaction Saved via: ${reason}`);
+      sessionStorage.setItem("tidioInteracted", "true");
+    }
+  }
+
+  function hasUserInteracted() {
+    return sessionStorage.getItem("tidioInteracted") === "true";
+  }
+
+  // 2. GLOBAL HEARTBEAT
+  setInterval(() => {
+    const tidioEl = document.getElementById("tidio-chat");
+    if (tidioEl && tidioEl.classList.contains("tidio-visible")) {
+      secondsOpen++;
+      if (secondsOpen >= 5) {
+        markAsInteracted("Global Heartbeat > 5s");
+      }
+    } else {
+      secondsOpen = 0; 
+    }
+  }, 1000);
+
+  /********************
+   * Helper functions *
+   ********************/
+  function waitForElement(selector, timeout = 10000) {
+    return new Promise((resolve, reject) => {
+      const interval = 100;
+      let elapsed = 0;
+      const timer = setInterval(() => {
+        const el = document.querySelector(selector);
+        if (el) {
+          clearInterval(timer);
+          resolve(el);
+        }
+        elapsed += interval;
+        if (elapsed >= timeout) {
+          clearInterval(timer);
+          reject(new Error("Element not found: " + selector));
+        }
+      }, interval);
+    });
+  }
+
+  function waitForTidioApi(timeout = 10000) {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      (function check() {
+        if (window.tidioChatApi && typeof window.tidioChatApi.open === "function") {
+          resolve(window.tidioChatApi);
+        } else if (Date.now() - start >= timeout) {
+          reject(new Error("Tidio API not ready"));
+        } else {
+          setTimeout(check, 200);
+        }
+      })();
+    });
+  }
+
+  function getIsoRegion(zip) {
+    if (!zip) return "";
+    zip = zip.trim();
+    if (/^\d{5}$/.test(zip)) {
+      var zipNum = parseInt(zip, 10);
+      const US_ZIP_RANGES = [
+        { iso: "AL", min: 35004, max: 36925 }, { iso: "AK", min: 99501, max: 99950 },
+        { iso: "AZ", min: 85001, max: 86556 }, { iso: "AR", min: 71601, max: 72959 },
+        { iso: "CA", min: 90001, max: 96162 }, { iso: "CO", min: 80001, max: 81658 },
+        { iso: "CT", min: 6001, max: 6928 }, { iso: "DE", min: 19701, max: 19980 },
+        { iso: "FL", min: 32003, max: 34997 }, { iso: "GA", min: 30002, max: 39901 },
+        { iso: "HI", min: 96701, max: 96898 }, { iso: "ID", min: 83201, max: 83877 },
+        { iso: "IL", min: 60001, max: 62999 }, { iso: "IN", min: 46001, max: 47997 },
+        { iso: "IA", min: 50001, max: 52809 }, { iso: "KS", min: 66002, max: 67954 },
+        { iso: "KY", min: 40003, max: 42788 }, { iso: "LA", min: 70001, max: 71497 },
+        { iso: "ME", min: 3901, max: 4992 }, { iso: "MD", min: 20588, max: 21930 },
+        { iso: "MA", min: 1001, max: 5544 }, { iso: "MI", min: 48001, max: 49971 },
+        { iso: "MN", min: 55001, max: 56763 }, { iso: "MS", min: 38601, max: 39776 },
+        { iso: "MO", min: 63001, max: 65899 }, { iso: "MT", min: 59001, max: 59937 },
+        { iso: "NE", min: 68001, max: 69367 }, { iso: "NV", min: 88901, max: 89883 },
+        { iso: "NH", min: 3031, max: 3897 }, { iso: "NJ", min: 7001, max: 8989 },
+        { iso: "NM", min: 87001, max: 88439 }, { iso: "NY", min: 501, max: 14925 },
+        { iso: "NC", min: 27006, max: 28909 }, { iso: "ND", min: 58001, max: 58856 },
+        { iso: "OH", min: 43001, max: 45999 }, { iso: "OK", min: 73001, max: 74966 },
+        { iso: "OR", min: 97001, max: 97920 }, { iso: "PA", min: 15001, max: 19640 },
+        { iso: "RI", min: 2801, max: 2940 }, { iso: "SC", min: 29001, max: 29945 },
+        { iso: "SD", min: 57001, max: 57799 }, { iso: "TN", min: 37010, max: 38589 },
+        { iso: "TX", min: 73301, max: 88595 }, { iso: "UT", min: 84001, max: 84791 },
+        { iso: "VT", min: 5001, max: 5907 }, { iso: "VA", min: 20101, max: 24658 },
+        { iso: "WA", min: 98001, max: 99403 }, { iso: "WV", min: 24701, max: 26886 },
+        { iso: "WI", min: 53001, max: 54990 }, { iso: "WY", min: 82001, max: 83414 }
+      ];
+      for (var i = 0; i < US_ZIP_RANGES.length; i++) {
+        var range = US_ZIP_RANGES[i];
+        if (zipNum >= range.min && zipNum <= range.max) return range.iso;
+      }
+      return "USA";
+    }
+    if (/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/.test(zip)) {
+      const firstChar = zip.charAt(0).toUpperCase();
+      if (["A","B","C","E"].includes(firstChar)) return "EastCan";
+      return "CAN";
+    }
+    return zip;
+  }
+
+  function setRandomVisitorName(api) {
+    if (!api || typeof api.setVisitorData !== "function") return;
+    const zip = sessionStorage.getItem("zip") || "";
+    const randomStr = Math.random().toString(36).substr(2, 6);
+    const newName = randomStr + "-" + zip;
+    api.setVisitorData({ name: newName });
+  }
+
+  function sendHandoffMessages(api) {
+    if (!api) return;
+    const zip = sessionStorage.getItem("zip") || "there";
+    const region = getIsoRegion(zip);
+    if (typeof api.messageFromVisitor === "function") {
+      api.messageFromVisitor(`Connected to logistics - ${region} ${zip}`);
+    }
+    if (typeof api.messageFromOperator === "function") {
+      setTimeout(() => {
+        api.messageFromOperator("Hello! We have beds stocked near you and can deliver quickly if needed.");
+        setTimeout(() => {
+          api.messageFromOperator("Do you have a particular model you're interested in?");
+        }, 4000);
+      }, 2000);
+    }
+  }
+
+  function repositionTidioButton() {
+    const launcher = document.querySelector('#tidio-chat iframe[name="tidio-chat-button"]');
+    if (!launcher) return;
+    const isMobile = window.innerWidth <= 767;
+    const bottom = isMobile ? "15px" : "10px";
+    const left = isMobile ? "2px" : "0px";
+    launcher.style.position = "fixed";
+    launcher.style.bottom = bottom;
+    launcher.style.left = left;
+    launcher.style.right = "auto";
+  }
+
+  /************************
+   * Main Tidio integrator *
+   ************************/
+  function triggerTidioWidget(options = {}) {
+    const { fromTypebot = false, open = false, trackEvent } = options;
+    const customButton = document.getElementById("custom-tidio-button");
+
+    waitForElement("#tidio-chat", 10000).then(tidioContainer => {
+      if(open) tidioContainer.classList.add('tidio-visible');
+    }).catch(console.error);
+
+    if (customButton && !open && hasUserInteracted()) {
+      customButton.classList.add('button-visible');
+    }
+
+    waitForTidioApi().then(api => {
+      if (!window.__tidioIntegrationInitialized) {
+        window.__tidioIntegrationInitialized = true;
+
+        // Strict Interaction Listeners
+        api.on("messageFromVisitor", () => markAsInteracted("Visitor Typed (API)"));
+        
+        if (customButton) {
+          customButton.addEventListener("click", () => {
+            api.open();
+            const tidioEl = document.getElementById("tidio-chat");
+            if(tidioEl) tidioEl.classList.add('tidio-visible');
+          });
+        }
+
+        // OPEN EVENT
+        api.on("open", function () {
+          if (customButton) customButton.classList.remove('button-visible');
+          const tidioEl = document.getElementById("tidio-chat");
+          if(tidioEl) tidioEl.classList.add('tidio-visible');
+        });
+
+        // CLOSE EVENT
+        api.on("close", function () {
+          setTimeout(() => {
+            const tidioEl = document.getElementById("tidio-chat");
+            
+            if (!hasUserInteracted()) {
+              if(tidioEl) tidioEl.classList.remove('tidio-visible');
+              if(customButton) customButton.classList.remove('button-visible');
+            } else {
+              if(tidioEl) tidioEl.classList.remove('tidio-visible'); 
+              if(customButton) customButton.classList.add('button-visible'); 
+            }
+          }, 100); 
+        });
+
+        setRandomVisitorName(api);
+        repositionTidioButton();
+        window.addEventListener("resize", () => {
+          clearTimeout(window.__tidioRepositionTimeout);
+          window.__tidioRepositionTimeout = setTimeout(repositionTidioButton, 200);
+        });
+      }
+
+      if (fromTypebot && !sessionStorage.getItem("prefilledMessageSent")) {
+        sendHandoffMessages(api);
+        sessionStorage.setItem("prefilledMessageSent", "true");
+      }
+
+      if (open) {
+        if (typeof api.show === "function") api.show();
+        if (typeof api.open === "function") api.open();
+        
+        const tidioEl = document.getElementById("tidio-chat");
+        if(tidioEl) tidioEl.classList.add('tidio-visible');
+        if(customButton) customButton.classList.remove('button-visible');
+      }
+
+      if (trackEvent && typeof api.track === "function") {
+        api.track(trackEvent);
+      }
+    }).catch(console.error);
+  }
+
+  /******************************
+   * TYPEBOT → TIDIO HANDOFF    *
+   ******************************/
+  window.addEventListener("message", function (event) {
+    if (event.data && event.data.type === "TYPEBOT_HANDOFF") {
+      try {
+        if (window.Typebot && typeof window.Typebot.close === "function") {
+          window.Typebot.close();
+        }
+      } catch (e) {}
+
+      const typebotElement = document.querySelector('typebot-bubble');
+      if (typebotElement) {
+        typebotElement.style.display = 'none';
+        typebotElement.style.opacity = '0';
+        typebotElement.style.pointerEvents = 'none';
+      }
+
+      sessionStorage.setItem("typebotHandoffCompleted", "true");
+      
+      markAsInteracted("Typebot Handoff"); 
+
+      triggerTidioWidget({
+        fromTypebot: true,
+        open: true,
+        trackEvent: "typebot_handoff_triggered"
+      });
+    }
+  });
+
+  /******************************
+   * TYPEBOT INIT (BUBBLE)      *
+   ******************************/
+  document.addEventListener("DOMContentLoaded", function () {
+    (async function () {
+      try {
+        const TypebotModule = await import("https://cdn.jsdelivr.net/npm/@typebot.io/js@0.3/dist/web.js");
+        const Typebot = TypebotModule.default;
+        window.Typebot = Typebot;
+
+        if (!sessionStorage.getItem("typebotHandoffCompleted")) {
+          Typebot.initBubble({
+            typebot: "zip-validator-tidio-q3t8pze",
+            previewMessage: {
+              message: "Need Quick Delivery?",
+              autoShowDelay: 1000
+            },
+            theme: {
+              placement: "left",
+              button: {
+                backgroundColor: "#C3AB74",
+                iconColor: "#25385b",
+                customIconSrc: "https://www.sondercare.com/wp-content/uploads/2025/09/Chat-bubble-sized.png"
+              },
+              chatWindow: { backgroundColor: "#f7f7f7", maxHeight: "400px" }
+            }
+          });
+        } else {
+          triggerTidioWidget({ open: false });
+        }
+      } catch (error) {
+        console.error("Error loading Typebot module:", error);
+      }
+    })();
+  });
+
+  /*************************************
+   * LIVECHAT CTA HANDLERS              *
+   *************************************/
+  document.addEventListener("DOMContentLoaded", function () {
+    function openTidioChat(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      triggerTidioWidget({
+        open: true,
+        trackEvent: "livechat_handoff_triggered"
+      });
+      return false;
+    }
+
+    const desktopButtons = document.querySelectorAll(".deskctaclick");
+    desktopButtons.forEach(function (button) {
+      if (button.classList.contains("deskorderclick") ||
+          button.classList.contains("deskdemoclick") ||
+          button.classList.contains("deskcallclick")) return;
+      const links = button.querySelectorAll("a");
+      links.forEach(function (link) {
+        const href = link.getAttribute("href") || "";
+        if (href.startsWith("tel:")) return;
+        link.addEventListener("click", openTidioChat);
+      });
+    });
+
+    const mobileElements = document.querySelectorAll(".mobctaclick, .cta-text, .cta-icon, .cta-flex");
+    mobileElements.forEach(function (element) {
+      let skip = false;
+      const links = element.querySelectorAll("a");
+      links.forEach(function (link) {
+        const href = link.getAttribute("href") || "";
+        if (href.startsWith("tel:") || href.includes("request-demo") || href.includes("/beds/")) skip = true;
+      });
+      if (skip) return;
+      element.addEventListener("click", openTidioChat);
+      links.forEach(function (link) {
+        link.addEventListener("click", openTidioChat);
+      });
+    });
+
+    const ctaBar = document.querySelector(".cta-bar");
+    if (ctaBar) {
+      let skip = false;
+      const links = ctaBar.querySelectorAll("a");
+      links.forEach(function (link) {
+        const href = link.getAttribute("href") || "";
+        if (href.startsWith("tel:") || href.includes("request-demo") || href.includes("/beds/")) skip = true;
+      });
+      if (!skip) {
+        ctaBar.addEventListener("click", openTidioChat);
+        ctaBar.style.cursor = "pointer";
+      }
+    }
+  });
+</script>

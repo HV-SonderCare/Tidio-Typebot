@@ -1,0 +1,121 @@
+<style>
+  /* 1. TIDIO WRAPPER (The Invisible Box) - Always Pass-Through */
+  #tidio-chat {
+    opacity: 0;
+    visibility: hidden;
+    z-index: 9999999999 !important;
+    pointer-events: none !important;
+  }
+
+  /* 2. VISIBLE STATE */
+  #tidio-chat.tidio-visible {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  /* 3. CHAT WINDOW - Capture clicks */
+  #tidio-chat iframe {
+    pointer-events: auto !important;
+  }
+
+  /* Custom overlay button (tree icon) */
+  #custom-tidio-button {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    display: block;
+    position: fixed;
+    /*left: 28px;
+    bottom: 55px;*/
+    right: 17px;
+    bottom: 15px;
+    /* 		width & height initally was 55px */
+    width: 65px;
+    height: 65px;
+    z-index: 10000000000 !important;
+    background: url('https://www.sondercare.com/wp-content/uploads/2025/11/chat.png') no-repeat center center;
+    background-size: 85%;
+    cursor: pointer;
+  }
+
+  #custom-tidio-button.button-visible {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  @media (max-width: 767px) {
+    #custom-tidio-button {
+      /*left: 2px;
+      bottom: 58px;*/
+      right: 17px;
+      bottom: 15px;
+    }
+  }
+
+  #tidio-chat-root .grid-layout {
+    margin: 15px !important;
+  }
+
+  /* TYPEBOT STYLING */
+  typebot-bubble {
+    z-index: 9999 !important;
+  }
+
+  typebot-bubble::part(preview-message) {
+    display: inline-flex;
+    align-items: center;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 0.88rem;
+    padding-bottom: 0.78rem;
+    background-color: #c3ab74;
+    color: #25385b;
+    border: 2px solid #25385b;
+    font-family: sans-serif;
+    font-size: 0.875rem;
+    border-radius: 0.5rem;
+    transition: all 300ms ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    position: fixed;
+    bottom: 1.28rem;
+    left: 4.4rem;
+    width: auto !important;
+    z-index: 10000 !important;
+  }
+
+  typebot-bubble::part(preview-message):hover {
+    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  typebot-bubble::part(preview-message-close-button) {
+    opacity: 1 !important;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  typebot-bubble::part(button-icon) {
+    color: #25385b !important;
+    fill: #25385b !important;
+    width: 40px;
+    height: 40px;
+  }
+
+  typebot-bubble::part(button) {
+    /*     border-radius: 50% !important; */
+    box-shadow: none !important;
+    border: 2px solid #25385b;
+  }
+
+  typebot-bubble[style*="display: none"] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+</style>
+
+<!-- Custom Tidio overlay button -->
+<div id="custom-tidio-button"></div>
+
+<!-- Tidio script -->
+<script src="//code.tidio.co/sr4jfyhwifrijb0tosczzkgctr8wbwty.js" async></script>

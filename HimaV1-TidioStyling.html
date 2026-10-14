@@ -1,0 +1,215 @@
+<style>
+  /* More comprehensive selectors for the Tidio widget */
+  #tidio-chat-iframe, 
+  #tidio-chat iframe[name="tidio-chat-iframe"],
+  iframe[id^="tidio-chat"],
+  #tidio-chat-button, 
+  #tidio-chat iframe[name="tidio-chat-button"],
+  #tidio-chat [id*="button"],
+  div[id^="tidio-chat"] > iframe,
+  #tidio-chat-app,
+  #tidio-chat-iframe + iframe {
+    bottom: 10px !important; /* Move higher from bottom */
+    left: 0px !important; /* Move more to the left */
+    right: auto !important; /* Ensure right positioning is removed */
+    transform: none !important; /* Prevent any transform manipulation */
+    /*z-index: 999999 !important;*/ /* High z-index to prevent overlap issues */
+  }
+
+  /* Mobile-specific adjustments with stronger specificity */
+  @media only screen and (max-width: 767px) {
+    #tidio-chat-iframe, 
+    #tidio-chat iframe[name="tidio-chat-iframe"],
+    iframe[id^="tidio-chat"],
+    #tidio-chat-button,
+    #tidio-chat iframe[name="tidio-chat-button"],
+    #tidio-chat [id*="button"],
+    div[id^="tidio-chat"] > iframe,
+    #tidio-chat-app,
+    #tidio-chat-iframe + iframe {
+      bottom: 15px !important; /* Much higher on mobile */
+      left: 2px !important; /* Slightly more left on mobile */
+    }
+  }
+
+  /* Fix for the main Tidio container */
+  #tidio-chat {
+    /*z-index: 999999 !important;*/
+    pointer-events: auto !important;
+  }
+  
+  /* Make sure the custom overlay is also positioned correctly */
+  #custom-tidio-button {
+    bottom: 60px !important;
+    left: 0px !important;
+  }
+  
+  @media only screen and (max-width: 767px) {
+    #custom-tidio-button {
+      bottom: 58px !important;
+      left: 2px !important;
+    }
+  }
+  
+  /* Ensure Typebot bubble doesn't get hidden */
+  div[part="preview-message"] {
+    z-index: 100000 !important;
+  }
+
+</style>
+
+<script>
+  // Global interval reference
+  let tidioPositioningInterval;
+  
+  // Function to fix Tidio positioning by applying styles directly to elements
+  function enforceTidioPositioning() {
+    // Get device type
+    const isMobile = window.innerWidth <= 767;
+    const bottomPosition = isMobile ? '15px' : '10px';
+    const leftPosition = isMobile ? '2px' : '0px';
+    
+    // Target ALL iframes and look for Tidio-related ones
+    const allIframes = document.querySelectorAll('iframe');
+    allIframes.forEach(frame => {
+      const frameId = frame.id || '';
+      const frameName = frame.name || '';
+      const frameClass = frame.className || '';
+      
+      // Match any Tidio-related attributes
+      if (frameId.includes('tidio') || 
+          frameName.includes('tidio') || 
+          frameClass.includes('tidio') ||
+          frame.src?.includes('tidio')) {
+        
+        frame.style.setProperty('bottom', bottomPosition, 'important');
+        frame.style.setProperty('left', leftPosition, 'important');
+        frame.style.setProperty('right', 'auto', 'important');
+        frame.style.setProperty('transform', 'none', 'important');
+        frame.style.setProperty('z-index', '999999', 'important');
+        
+        // Also check parent elements
+        let parent = frame.parentElement;
+        for (let i = 0; i < 3 && parent; i++) { // Check up to 3 levels up
+          if (parent.id?.includes('tidio') || parent.className?.includes('tidio')) {
+            parent.style.setProperty('bottom', bottomPosition, 'important');
+            parent.style.setProperty('left', leftPosition, 'important');
+          }
+          parent = parent.parentElement;
+        }
+      }
+    });
+    
+    // Target specific Tidio elements by ID pattern
+    const tidioElements = document.querySelectorAll('[id*="tidio"], [class*="tidio"]');
+    tidioElements.forEach(el => {
+      el.style.setProperty('bottom', bottomPosition, 'important');
+      el.style.setProperty('left', leftPosition, 'important');
+      el.style.setProperty('right', 'auto', 'important');
+      el.style.setProperty('transform', 'none', 'important');
+    });
+    
+    // Also apply to the custom button
+    const customButton = document.getElementById('custom-tidio-button');
+    if (customButton) {
+      customButton.style.setProperty('bottom', bottomPosition, 'important');
+      customButton.style.setProperty('left', leftPosition, 'important');
+    }
+    
+    // Add !important style tag dynamically to ensure CSS specificity
+    const existingStyle = document.getElementById('tidio-aggressive-style');
+    if (!existingStyle) {
+      const styleTag = document.createElement('style');
+      styleTag.id = 'tidio-aggressive-style';
+      styleTag.innerHTML = `
+        #tidio-chat-iframe, 
+        iframe[id^="tidio"],
+        [id*="tidio-"],
+        [class*="tidio"] {
+          bottom: ${bottomPosition} !important;
+          left: ${leftPosition} !important;
+          right: auto !important;
+          transform: none !important;
+        }
+      `;
+      document.head.appendChild(styleTag);
+    }
+  }
+  
+  // Increase the enforcement frequency
+  function startAggressivePositioning() {
+    // Clear any existing interval
+    if (tidioPositioningInterval) {
+      clearInterval(tidioPositioningInterval);
+    }
+    
+    // Apply immediately
+    enforceTidioPositioning();
+    
+    // Then apply very frequently at first, then less frequently
+    setTimeout(() => enforceTidioPositioning(), 100);
+    setTimeout(() => enforceTidioPositioning(), 200);
+    setTimeout(() => enforceTidioPositioning(), 500);
+    setTimeout(() => enforceTidioPositioning(), 1000);
+    setTimeout(() => enforceTidioPositioning(), 2000);
+    
+    // Set a regular interval for continued enforcement
+    tidioPositioningInterval = setInterval(enforceTidioPositioning, 1000);
+  }
+  
+  // Start when DOM is loaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startAggressivePositioning);
+  } else {
+    startAggressivePositioning();
+  }
+  
+  // Reapply on load
+  window.addEventListener('load', enforceTidioPositioning);
+  
+  // Create a MutationObserver to detect when Tidio elements are added to the DOM
+  const observer = new MutationObserver(mutations => {
+    for (const mutation of mutations) {
+      if (mutation.addedNodes.length) {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === 1) { // Is Element
+            if (node.id?.includes('tidio') || 
+                node.className?.includes('tidio') || 
+                node.tagName === 'IFRAME') {
+              enforceTidioPositioning();
+              break;
+            }
+          }
+        }
+      }
+    }
+  });
+  
+  // Start observing the document with the configured parameters
+  observer.observe(document.body, { childList: true, subtree: true });
+  
+  // Reapply on resize events
+  let resizeTimeout;
+  window.addEventListener('resize', function() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(enforceTidioPositioning, 200);
+  });
+  
+  // Also try to hook into Tidio's API if available
+  function hookTidioAPI() {
+    if (window.tidioChatApi) {
+      // Apply positioning when chat opens
+      if (typeof window.tidioChatApi.on === 'function') {
+        window.tidioChatApi.on('open', enforceTidioPositioning);
+        window.tidioChatApi.on('close', enforceTidioPositioning);
+        window.tidioChatApi.on('ready', enforceTidioPositioning);
+      }
+    } else {
+      // Try again in a second
+      setTimeout(hookTidioAPI, 1000);
+    }
+  }
+  
+  // Start trying to hook into Tidio's API
+  hookTidioAPI();
+</script>

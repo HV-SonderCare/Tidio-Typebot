@@ -1,0 +1,355 @@
+<style>
+  /* Initially hide both the Tidio widget container and the custom overlay */
+  #tidio-chat,
+  #custom-tidio-button {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  
+  /* Force a high z-index on the Tidio widget container */
+  #tidio-chat {
+    z-index: 9999999999 !important;
+  }
+  
+  /* Custom overlay styling (positioned over Tidio’s default area)
+     with an even higher z-index so it always stays on top */
+  #custom-tidio-button {
+    display: block;
+    position: fixed;
+    left: 28px;      /* For a 55×55 overlay centered on Tidio’s default area */
+    bottom: 55px;
+    width: 55px;
+    height: 55px;
+    z-index: 10000000000 !important;
+    background: url('https://scare.pushstatic.com/wp-content/uploads/2025/01/just-trees-white.png')
+      no-repeat center center;
+    background-size: 85%;  /* Scale the tree image slightly smaller */
+    cursor: pointer;
+  }
+</style>
+
+<!-- Custom Overlay Element -->
+<div id="custom-tidio-button"></div>
+
+<!-- Tidio Widget Script (ensure this is present so its API loads) -->
+<script src="//code.tidio.co/sr4jfyhwifrijb0tosczzkgctr8wbwty.js" async></script>
+
+<script>
+  // Helper: Wait for an element matching a selector to exist.
+  function waitForElement(selector, timeout = 10000) {
+    return new Promise((resolve, reject) => {
+      const interval = 100;
+      let elapsed = 0;
+      const timer = setInterval(() => {
+        const element = document.querySelector(selector);
+        if (element) {
+          clearInterval(timer);
+          resolve(element);
+        }
+        elapsed += interval;
+        if (elapsed >= timeout) {
+          clearInterval(timer);
+          reject(new Error("Element not found: " + selector));
+        }
+      }, interval);
+    });
+  }
+
+  // Global function: Reveals the Tidio widget and custom overlay,
+  // re-applies necessary styles, attaches event listeners,
+  // and sends a prefilled operator message only if triggered via Typebot handoff.
+  function triggerTidioWidget() {
+  // Ensure the Tidio widget container is visible.
+  waitForElement('#tidio-chat').then((tidioContainer) => {
+    tidioContainer.style.opacity = '1';
+    tidioContainer.style.pointerEvents = 'auto';
+    tidioContainer.style.zIndex = '9999999999';
+  }).catch(console.error);
+  
+  // Ensure the custom overlay (tree icon) is visible.
+  var customButton = document.getElementById('custom-tidio-button');
+  if (customButton) {
+    customButton.style.opacity = '1';
+    customButton.style.pointerEvents = 'auto';
+    customButton.style.display = 'block';
+    customButton.style.zIndex = '10000000000';
+  }
+  
+  // Utility: Wait until Tidio's API is ready.
+  function waitForTidio(callback) {
+    if (window.tidioChatApi && typeof window.tidioChatApi.open === 'function') {
+      callback();
+    } else {
+      setTimeout(() => { waitForTidio(callback); }, 500);
+    }
+  }
+  
+  waitForTidio(() => {
+    // (Re)bind the click event on the custom overlay to open the chat.
+    customButton.removeEventListener('click', customButton._tidioClickHandler);
+    customButton._tidioClickHandler = function() {
+      window.tidioChatApi.open();
+    };
+    customButton.addEventListener('click', customButton._tidioClickHandler);
+    
+    // When the chat opens, hide the custom overlay.
+    window.tidioChatApi.on("open", function() {
+      customButton.style.display = 'none';
+    });
+    
+    // When the chat closes, re-show the overlay after a short delay.
+    window.tidioChatApi.on("close", function() {
+      setTimeout(() => {
+        customButton.style.display = 'block';
+        waitForElement('#tidio-chat').then((tidioContainer) => {
+          tidioContainer.style.opacity = '1';
+          tidioContainer.style.pointerEvents = 'auto';
+          tidioContainer.style.zIndex = '9999999999';
+        });
+      }, 300);
+    });
+    
+    // *** NEW: Set Tidio Visitor Name with a Random String + Zip ***
+    function setVisitorName() {
+      const zip = sessionStorage.getItem('zip') || '';
+      // Generate a 6-character random alphanumeric string
+      const randomStr = Math.random().toString(36).substr(2, 6);
+      const newName = randomStr + '-' + zip;
+      if (window.tidioChatApi && typeof window.tidioChatApi.setVisitorData === 'function') {
+        window.tidioChatApi.setVisitorData({ name: newName });
+      } else {
+        console.warn("Tidio API 'setVisitorData' method is not available.");
+      }
+    }
+    setVisitorName();
+    
+    // --- Prefilled Message Section ---
+// Only send the operator's prefilled messages if triggered via the Typebot handoff.
+if (sessionStorage.getItem('typebotHandoffInitiated') && !sessionStorage.getItem('prefilledMessageSent')) {
+    // Open the chat if not already open.
+    window.tidioChatApi.open();
+    
+    // Helper function to convert a US zip or Canadian postal code into an ISO region code.
+    function getIsoRegion(zip) {
+        zip = zip.trim();
+        // Process US zip codes (exactly 5 digits)
+        if (/^\d{5}$/.test(zip)) {
+            var zipNum = parseInt(zip, 10);
+            const US_ZIP_RANGES = [
+                { iso: "AL", min: 35004, max: 36925 },
+                { iso: "AK", min: 99501, max: 99950 },
+                { iso: "AZ", min: 85001, max: 86556 },
+                { iso: "AR", min: 71601, max: 72959 },
+                { iso: "CA", min: 90001, max: 96162 },
+                { iso: "CO", min: 80001, max: 81658 },
+                { iso: "CT", min: 6001,  max: 6928  },  // 06001-06928
+                { iso: "DE", min: 19701, max: 19980 },
+                { iso: "FL", min: 32003, max: 34997 },
+                { iso: "GA", min: 30002, max: 39901 },
+                { iso: "HI", min: 96701, max: 96898 },
+                { iso: "ID", min: 83201, max: 83877 },
+                { iso: "IL", min: 60001, max: 62999 },
+                { iso: "IN", min: 46001, max: 47997 },
+                { iso: "IA", min: 50001, max: 52809 },
+                { iso: "KS", min: 66002, max: 67954 },
+                { iso: "KY", min: 40003, max: 42788 },
+                { iso: "LA", min: 70001, max: 71497 },
+                { iso: "ME", min: 3901,  max: 4992  },  // 03901-04992
+                { iso: "MD", min: 20588, max: 21930 },
+                { iso: "MA", min: 1001,  max: 5544  },  // 01001-05544
+                { iso: "MI", min: 48001, max: 49971 },
+                { iso: "MN", min: 55001, max: 56763 },
+                { iso: "MS", min: 38601, max: 39776 },
+                { iso: "MO", min: 63001, max: 65899 },
+                { iso: "MT", min: 59001, max: 59937 },
+                { iso: "NE", min: 68001, max: 69367 },
+                { iso: "NV", min: 88901, max: 89883 },
+                { iso: "NH", min: 3031,  max: 3897  },  // 03031-03897
+                { iso: "NJ", min: 7001,  max: 8989  },  // 07001-08989
+                { iso: "NM", min: 87001, max: 88439 },
+                { iso: "NY", min: 501,   max: 14925 },  // 00501-14925
+                { iso: "NC", min: 27006, max: 28909 },
+                { iso: "ND", min: 58001, max: 58856 },
+                { iso: "OH", min: 43001, max: 45999 },
+                { iso: "OK", min: 73001, max: 74966 },
+                { iso: "OR", min: 97001, max: 97920 },
+                { iso: "PA", min: 15001, max: 19640 },
+                { iso: "RI", min: 2801,  max: 2940  },  // 02801-02940
+                { iso: "SC", min: 29001, max: 29945 },
+                { iso: "SD", min: 57001, max: 57799 },
+                { iso: "TN", min: 37010, max: 38589 },
+                { iso: "TX", min: 73301, max: 88595 },
+                { iso: "UT", min: 84001, max: 84791 },
+                { iso: "VT", min: 5001,  max: 5907  },  // 05001-05907
+                { iso: "VA", min: 20101, max: 24658 },
+                { iso: "WA", min: 98001, max: 99403 },
+                { iso: "WV", min: 24701, max: 26886 },
+                { iso: "WI", min: 53001, max: 54990 },
+                { iso: "WY", min: 82001, max: 83414 }
+            ];
+            for (var i = 0; i < US_ZIP_RANGES.length; i++) {
+                var range = US_ZIP_RANGES[i];
+                if (zipNum >= range.min && zipNum <= range.max) {
+                    return range.iso;
+                }
+            }
+            return "USA";
+        }
+        // Process Canadian postal codes (format like A1A 1A1)
+        else if (/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/.test(zip)) {
+            const firstChar = zip.charAt(0).toUpperCase();
+            if (firstChar === "A") return "NL";
+            if (firstChar === "B") return "NS";
+            if (firstChar === "C") return "PE";
+            if (firstChar === "E") return "NB";
+            if (["G", "H", "J"].includes(firstChar)) return "QC";
+            if (["K", "L", "M", "N", "P"].includes(firstChar)) return "ON";
+            if (firstChar === "R") return "MB";
+            if (firstChar === "S") return "SK";
+            if (firstChar === "T") return "AB";
+            if (firstChar === "V") return "BC";
+            if (firstChar === "X") return "NT";
+            if (firstChar === "Y") return "YT";
+            return "CAN";
+        } else {
+            return zip;
+        }
+    }
+    
+    // Simulate a visitor message first.
+    setTimeout(() => {
+        if (typeof window.tidioChatApi.messageFromVisitor === 'function') {
+            const zip = sessionStorage.getItem('zip') || 'there';
+            const region = getIsoRegion(zip);
+            // Visitor message now includes the ISO region code and zip.
+            window.tidioChatApi.messageFromVisitor(`Connected to logistics - ${region} ${zip}`);
+            
+            // Now send the operator's message after a delay.
+            setTimeout(() => {
+                if (typeof window.tidioChatApi.messageFromOperator === 'function') {
+                    // Operator's message is plain text.
+                    window.tidioChatApi.messageFromOperator("Hello! We have beds stocked near you and can deliver quickly if needed.");
+                    
+                    // Send the second operator message after another delay.
+                    setTimeout(() => {
+                        window.tidioChatApi.messageFromOperator("Do you have a particular model you're interested in?");
+                    }, 4000);
+                    
+                    sessionStorage.setItem('prefilledMessageSent', 'true');
+                } else {
+                    console.warn("Tidio API 'messageFromOperator' method is not available.");
+                }
+            }, 2000);
+        } else {
+            console.warn("Tidio API 'messageFromVisitor' method is not available.");
+        }
+    }, 2000);
+}
+  });
+}
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      // Dynamically import the Typebot module.
+      const TypebotModule = await import('https://cdn.jsdelivr.net/npm/@typebot.io/js@0.3/dist/web.js');
+      const Typebot = TypebotModule.default;
+      console.log("Typebot module loaded:", Typebot);
+      
+      // If the handoff has NOT occurred this session, initialize the Typebot bubble.
+      if (!sessionStorage.getItem('typebotHandoffCompleted')) {
+        Typebot.initBubble({
+          typebot: "zip-validator-tidio-q3t8pze",  // Fixed Typebot ID.
+          previewMessage: { 
+            message: "Need Quick Delivery?", 
+            autoShowDelay: 2000 
+          },
+          theme: {
+            placement: "left",
+            button: {
+              backgroundColor: "#2a305c",
+              customIconSrc: "https://s3.typebot.io/public/workspaces/cm6826b90000b683eotgw3ojv/typebots/cm6826lam0001wenuta4cr5hp/bubble-icon?v=1737574307473"
+            },
+            chatWindow: { backgroundColor: "#f7f7f7" }
+          }
+        });
+        console.log(`[Typebot] Bubble initialized at ${performance.now()}ms`);
+      } else {
+        console.log("Typebot handoff already completed this session; not initializing bubble.");
+        triggerTidioWidget();
+      }
+      
+      // Listen for the TYPEBOT_HANDOFF message.
+      window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === "TYPEBOT_HANDOFF") {
+          console.log(`[Typebot] Received TYPEBOT_HANDOFF message at ${performance.now()}ms:`, event.data);
+          
+          if (window.Typebot && typeof window.Typebot.unmount === "function") {
+            window.Typebot.unmount();
+          } else if (typeof window.Typebot.close === "function") {
+            window.Typebot.close();
+          }
+          
+          sessionStorage.setItem('typebotHandoffCompleted', 'true');
+          sessionStorage.setItem('typebotHandoffInitiated', 'true');
+          
+          triggerTidioWidget();
+          
+          if (window.tidioChatApi && typeof window.tidioChatApi.track === 'function') {
+            window.tidioChatApi.track('typebot_handoff_triggered');
+          }
+          
+          console.log(`Handoff payload: ${event.data.payload}`);
+        }
+      });
+      
+      // --- 
+      // CUSTOM STYLING: Poll for the bubble container element.
+      // The bubble is rendered as a <div> with part="preview-message"
+      // ---
+      const desiredClasses = [
+        "flex",
+        "items-center",
+        "px-4",
+        "py-3",
+        "bg-blue-950", // Make sure your Tailwind config includes blue-950
+        "text-white",
+        "font-sans",
+        "text-sm",
+        "rounded-lg",
+        "transition-all",
+        "duration-300",
+        "hover:opacity-90",
+        "shadow-md",
+        "hover:shadow-lg",
+        "fixed",
+        "bottom-6",
+        "left-6",
+        "z-50"
+      ];
+      
+      // Use setInterval to poll for the bubble element.
+      const bubbleInterval = setInterval(() => {
+        const bubbleElement = document.querySelector('div[part="preview-message"]');
+        if (bubbleElement) {
+          // Remove any inline styling (if you want a full override).
+          bubbleElement.removeAttribute('style');
+          // Optionally, you could also clear out existing classes:
+          // bubbleElement.className = "";
+          // Then add your desired classes.
+          bubbleElement.classList.add(...desiredClasses);
+          console.log("Applied custom Tailwind classes to the bubble container.");
+          clearInterval(bubbleInterval);
+        }
+      }, 100);
+      
+      // Optionally clear the interval after 10 seconds if the element never appears.
+      setTimeout(() => clearInterval(bubbleInterval), 10000);
+      
+    } catch (error) {
+      console.error("Error loading Typebot module:", error);
+    }
+  });
+</script>

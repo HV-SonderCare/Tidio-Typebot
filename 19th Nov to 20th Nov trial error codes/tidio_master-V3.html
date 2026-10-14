@@ -1,0 +1,161 @@
+<style>
+  /* Hides the custom "Tree" button immediately when clicked so it doesn't stay on screen with the chat. Manages the logic to show the button only when chat is closed. */
+  /* Initially hide Tidio container */
+  #tidio-chat {
+    opacity: 0;
+    pointer-events: none; /* Essential fix */
+    transition: opacity 0.3s ease;
+  }
+  
+  /* Custom overlay styling */
+  #custom-tidio-button {
+    display: block; /* Will be toggled by JS */
+    position: fixed;
+    left: 28px;
+    bottom: 55px;
+    width: 55px;
+    height: 55px;
+    z-index: 10000000000 !important;
+    background: url('https://scare.pushstatic.com/wp-content/uploads/2025/01/just-trees-white.png') no-repeat center center;
+    background-size: 85%;
+    cursor: pointer;
+  }
+</style>
+
+<!-- Custom Overlay Element -->
+<div id="custom-tidio-button"></div>
+
+<!-- Tidio Widget Script -->
+<script src="//code.tidio.co/sr4jfyhwifrijb0tosczzkgctr8wbwty.js" async></script>
+
+<script>
+  // Global function: Trigger widget and manage custom button
+  function triggerTidioWidget() {
+    const tidioContainer = document.querySelector('#tidio-chat');
+    if(tidioContainer) {
+        tidioContainer.style.opacity = '1';
+        tidioContainer.style.pointerEvents = 'none'; // Ensure page is clickable
+        tidioContainer.style.zIndex = '9999999999';
+    }
+  
+    // Ensure custom button is visible
+    var customButton = document.getElementById('custom-tidio-button');
+    if (customButton) {
+      customButton.style.display = 'block';
+    }
+  }
+
+  // Wait for API and setup listeners
+  function waitForTidio(callback) {
+    if (window.tidioChatApi && typeof window.tidioChatApi.open === 'function') {
+      callback();
+    } else {
+      setTimeout(() => { waitForTidio(callback); }, 500);
+    }
+  }
+  
+  waitForTidio(() => {
+    const customButton = document.getElementById('custom-tidio-button');
+    
+    // CLICK HANDLER: Hides button immediately, then opens chat
+    if(customButton) {
+        // Remove old listeners to be safe
+        const newBtn = customButton.cloneNode(true);
+        customButton.parentNode.replaceChild(newBtn, customButton);
+        
+        newBtn.addEventListener('click', function() {
+            this.style.display = 'none'; // Hide immediately
+            window.tidioChatApi.open();
+            console.log('typebot should hide');
+        });
+    }
+    
+    // API EVENTS
+    window.tidioChatApi.on("open", function() {
+      const btn = document.getElementById('custom-tidio-button');
+      if(btn) btn.style.display = 'none';
+    });
+    
+    window.tidioChatApi.on("close", function() {
+      setTimeout(() => {
+        const btn = document.getElementById('custom-tidio-button');
+        if(btn) btn.style.display = 'block';
+      }, 300);
+    });
+    
+    // VISITOR NAME GENERATOR
+    const zip = sessionStorage.getItem('zip') || '';
+    const randomStr = Math.random().toString(36).substr(2, 6);
+    if (typeof window.tidioChatApi.setVisitorData === 'function') {
+        window.tidioChatApi.setVisitorData({ name: randomStr + '-' + zip });
+    }
+    
+    // HANDOFF LOGIC
+    if (sessionStorage.getItem('typebotHandoffInitiated') && !sessionStorage.getItem('prefilledMessageSent')) {
+        window.tidioChatApi.open();
+        setTimeout(() => {
+            if (typeof window.tidioChatApi.messageFromVisitor === 'function') {
+                 window.tidioChatApi.messageFromVisitor(`Connected to logistics - ${zip}`);
+            }
+            setTimeout(() => {
+                if (typeof window.tidioChatApi.messageFromOperator === 'function') {
+                    window.tidioChatApi.messageFromOperator("Hello! We have beds stocked near you and can deliver quickly if needed.");
+                }
+                sessionStorage.setItem('prefilledMessageSent', 'true');
+            }, 2000);
+        }, 1000);
+    }
+  });
+</script>
+
+<script>
+  // TYPEBOT LOADER
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const TypebotModule = await import('https://cdn.jsdelivr.net/npm/@typebot.io/js@0.3/dist/web.js');
+      const Typebot = TypebotModule.default;
+      
+      if (!sessionStorage.getItem('typebotHandoffCompleted')) {
+        Typebot.initBubble({
+          typebot: "zip-validator-tidio-q3t8pze",
+          previewMessage: { message: "Need Quick Delivery?", autoShowDelay: 2000 },
+          theme: {
+            placement: "left",
+            button: { backgroundColor: "#c3ab74", customIconSrc: "https://scare2.pushstatic.com/wp-content/uploads/2025/11/chat-icon.png" },
+            chatWindow: { backgroundColor: "#f7f7f7", maxHeight:"400px" }
+          }
+        });
+      } else {
+        triggerTidioWidget();
+      }
+      
+      // Listen for HANDOFF
+      window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === "TYPEBOT_HANDOFF") {
+          if (window.Typebot) window.Typebot.close();
+          
+          sessionStorage.setItem('typebotHandoffCompleted', 'true');
+          sessionStorage.setItem('typebotHandoffInitiated', 'true');
+          
+          triggerTidioWidget();
+          if (window.tidioChatApi) {
+              window.tidioChatApi.open();
+              window.tidioChatApi.track('typebot_handoff_triggered');
+          }
+        }
+      });
+      
+      // Style Bubble
+      const bubbleInterval = setInterval(() => {
+        const bubbleElement = document.querySelector('div[part="preview-message"]');
+        if (bubbleElement) {
+          bubbleElement.removeAttribute('style');
+          bubbleElement.classList.add("bg-blue-950", "text-white", "rounded-lg", "shadow-md"); 
+          clearInterval(bubbleInterval);
+        }
+      }, 100);
+      setTimeout(() => clearInterval(bubbleInterval), 10000);
+      
+    } catch (error) { console.error("Error loading Typebot:", error); }
+  });
+</script>

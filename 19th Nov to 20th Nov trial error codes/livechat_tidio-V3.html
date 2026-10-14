@@ -1,0 +1,120 @@
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // When openTidioChat is called, it no longer sets pointer-events: auto on the container (which was breaking links).
+  // It ensures the container is visible, but "transparent" to clicks.
+  
+  // Detect if we're on mobile
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  console.log('Device detected:', isMobile ? 'Mobile' : 'Desktop');
+  
+  let chatJustClosed = false;
+  
+  // Function to open Tidio chat
+  function openTidioChat(e) {
+    if (chatJustClosed) return false;
+    
+    // Prevent default action
+    if(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    console.log('Chat button clicked');
+    
+    // --- CRITICAL FIX: Handle Container Visibility safely ---
+    const tidioElements = document.querySelectorAll('#tidio-chat');
+    tidioElements.forEach(function(el) {
+      if (el) {
+        el.style.opacity = '1';
+        el.style.display = 'block';
+        el.style.zIndex = '9999999999';
+        el.style.pointerEvents = 'none'; // FIX: Don't block the page
+      }
+    });
+
+    // Hide custom button immediately to prevent duplication
+    const customBtn = document.getElementById('custom-tidio-button');
+    if(customBtn) customBtn.style.display = 'none';
+    
+    // Use Tidio API
+    if (window.tidioChatApi) {
+      if (typeof window.tidioChatApi.track === 'function') window.tidioChatApi.track('livechat_handoff_triggered');
+      
+      // Force open
+      if (typeof window.tidioChatApi.open === 'function') {
+        window.tidioChatApi.open();
+      }
+      // Ensure it shows
+      if (typeof window.tidioChatApi.show === 'function') {
+        window.tidioChatApi.show();
+      }
+    }
+    
+    return false;
+  }
+  
+  // Setup Close Listeners
+  function setupTidioEventListeners() {
+    if (window.tidioChatApi) {
+      window.tidioChatApi.on('close', function() {
+        chatJustClosed = true;
+        setTimeout(function() { chatJustClosed = false; }, 1000);
+        
+        // Re-show custom button when chat closes
+        const customBtn = document.getElementById('custom-tidio-button');
+        if(customBtn) setTimeout(() => { customBtn.style.display = 'block'; }, 300);
+      });
+    } else {
+      setTimeout(setupTidioEventListeners, 1000);
+    }
+  }
+  setupTidioEventListeners();
+  
+  // --- CLICK HANDLERS FOR SITE BUTTONS ---
+  
+  // Desktop Buttons
+  const desktopButtons = document.querySelectorAll('.deskctaclick');
+  desktopButtons.forEach(function(button) {
+    if (button.classList.contains('deskorderclick') || button.classList.contains('deskdemoclick') || button.classList.contains('deskcallclick')) return;
+    
+    const links = button.querySelectorAll('a');
+    links.forEach(function(link) {
+      const href = link.getAttribute('href') || '';
+      if (href.startsWith('tel:')) return;
+      link.addEventListener('click', openTidioChat);
+    });
+  });
+  
+  // Mobile Elements
+  const mobileElements = document.querySelectorAll('.mobctaclick, .cta-text, .cta-icon, .cta-flex');
+  mobileElements.forEach(function(element) {
+    let skip = false;
+    const links = element.querySelectorAll('a');
+    links.forEach(function(link) {
+      const href = link.getAttribute('href') || '';
+      if (href.startsWith('tel:') || href.includes('request-demo') || href.includes('/beds/')) skip = true;
+    });
+    if (skip) return;
+    
+    element.addEventListener('click', openTidioChat);
+    links.forEach(function(link) {
+      link.removeAttribute('onclick');
+      link.addEventListener('click', openTidioChat);
+    });
+  });
+  
+  // Main CTA Bar
+  const ctaBar = document.querySelector('.cta-bar');
+  if (ctaBar) {
+    let skip = false;
+    const links = ctaBar.querySelectorAll('a');
+    links.forEach(function(link) {
+      const href = link.getAttribute('href') || '';
+      if (href.startsWith('tel:') || href.includes('request-demo') || href.includes('/beds/')) skip = true;
+    });
+    if (!skip) {
+      ctaBar.addEventListener('click', openTidioChat);
+      ctaBar.style.cursor = 'pointer';
+    }
+  }
+});
+</script>

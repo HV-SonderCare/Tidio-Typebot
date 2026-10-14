@@ -1,0 +1,150 @@
+<style>
+  /* --- FIX 1: UNBLOCK THE PAGE (The Inert Fix) --- */
+  #tidio-chat {
+    /* Allows clicks to pass through the full-screen container */
+    pointer-events: none !important; 
+    z-index: 999999 !important;
+    max-height: 100vh;
+  }
+
+  /* --- FIX 2: RE-ENABLE CLICKS ON CHAT WINDOW --- */
+  /* Only the actual Chat Window (iframe) should catch clicks */
+  #tidio-chat iframe, 
+  #tidio-chat div[id^="tidio-chat-iframe"],
+  iframe[title="Tidio Chat"] {
+    pointer-events: auto !important;
+  }
+
+  /* --- FIX 3: HIDE DEFAULT TIDIO ROUND BUTTON (The 3-Widget Fix) --- */
+  /* This forces the default button to disappear so only your Tree Icon shows */
+  #tidio-chat-button, 
+  #tidio-chat iframe[name="tidio-chat-button"],
+  #tidio-chat iframe[data-testid="widgetButton"],
+  .tidio-chat-widget-button {
+    display: none !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  /* --- POSITIONING FOR THE OPEN CHAT WINDOW --- */
+  #tidio-chat-iframe, 
+  #tidio-chat iframe[name="tidio-chat-iframe"],
+  iframe[id^="tidio-chat"] {
+    bottom: 60px !important;
+    left: 0px !important;
+    right: auto !important;
+    transform: none !important;
+    z-index: 999999 !important;
+  }
+
+  /* Mobile adjustments */
+  @media only screen and (max-width: 767px) {
+    #tidio-chat-iframe, 
+    #tidio-chat iframe[name="tidio-chat-iframe"],
+    iframe[id^="tidio-chat"] {
+      bottom: 58px !important;
+      left: 2px !important;
+    }
+  }
+  
+  /* --- CUSTOM TREE BUTTON POSITIONING --- */
+  #custom-tidio-button {
+    bottom: 60px !important;
+    left: 0px !important;
+  }
+  
+  @media only screen and (max-width: 767px) {
+    #custom-tidio-button {
+      bottom: 58px !important;
+      left: 2px !important;
+    }
+  }
+  
+  /* Ensure Typebot bubble doesn't get hidden */
+  div[part="preview-message"] {
+    z-index: 100000 !important;
+  }
+</style>
+
+<script>
+  // Global interval reference
+  let tidioPositioningInterval;
+  
+  // Function to fix Tidio positioning by applying styles directly to elements
+  function enforceTidioPositioning() {
+    const isMobile = window.innerWidth <= 767;
+    const bottomPosition = isMobile ? '58px' : '60px';
+    const leftPosition = isMobile ? '2px' : '0px';
+    
+    // Target ALL iframes
+    const allIframes = document.querySelectorAll('iframe');
+    allIframes.forEach(frame => {
+      const frameId = frame.id || '';
+      const frameName = frame.name || '';
+      
+      // Match Tidio iframes
+      if (frameId.includes('tidio') || frameName.includes('tidio') || frame.src?.includes('tidio')) {
+        
+        // HIDE the default button iframe aggressively
+        if(frameId.includes('button') || frameName.includes('button')) {
+            frame.style.setProperty('display', 'none', 'important');
+            return; 
+        }
+
+        // POSITION the chat window iframe
+        frame.style.setProperty('bottom', bottomPosition, 'important');
+        frame.style.setProperty('left', leftPosition, 'important');
+        frame.style.setProperty('right', 'auto', 'important');
+        frame.style.setProperty('transform', 'none', 'important');
+        frame.style.setProperty('z-index', '999999', 'important');
+        frame.style.setProperty('pointer-events', 'auto', 'important'); // Ensure chat is clickable
+        
+        // PREVENT CONTAINER from blocking clicks
+        let parent = frame.parentElement;
+        if (parent && (parent.id === 'tidio-chat' || parent.id.includes('tidio'))) {
+            parent.style.setProperty('pointer-events', 'none', 'important');
+            parent.style.setProperty('z-index', '999999', 'important');
+        }
+      }
+    });
+    
+    // Position Custom Button
+    const customButton = document.getElementById('custom-tidio-button');
+    if (customButton) {
+      customButton.style.setProperty('bottom', bottomPosition, 'important');
+      customButton.style.setProperty('left', leftPosition, 'important');
+    }
+  }
+  
+  // Increase the enforcement frequency
+  function startAggressivePositioning() {
+    if (tidioPositioningInterval) clearInterval(tidioPositioningInterval);
+    enforceTidioPositioning();
+    setTimeout(() => enforceTidioPositioning(), 100);
+    setTimeout(() => enforceTidioPositioning(), 500);
+    tidioPositioningInterval = setInterval(enforceTidioPositioning, 1000);
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startAggressivePositioning);
+  } else {
+    startAggressivePositioning();
+  }
+  
+  window.addEventListener('load', enforceTidioPositioning);
+  window.addEventListener('resize', function() { setTimeout(enforceTidioPositioning, 200); });
+  
+  // Hook into Tidio API
+  function hookTidioAPI() {
+    if (window.tidioChatApi) {
+      if (typeof window.tidioChatApi.on === 'function') {
+        window.tidioChatApi.on('open', enforceTidioPositioning);
+        window.tidioChatApi.on('close', enforceTidioPositioning);
+      }
+    } else {
+      setTimeout(hookTidioAPI, 1000);
+    }
+  }
+  hookTidioAPI();
+</script>
